@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IntelliWhisper Demo — Coding</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  background: #0d0d0f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+/* ── Screen ───────────────────────────────────────────────────────────────── */
+.screen {
+  width: 860px;
+  height: 520px;
+  background: radial-gradient(ellipse at 30% 20%, #1c1035 0%, #0e1520 55%, #0b1018 100%);
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 50px 120px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.06);
+  user-select: none;
+}
+
+/* ── Menu bar ─────────────────────────────────────────────────────────────── */
+.menu-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 26px;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  z-index: 100;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.mb-apple { font-size: 14px; color: rgba(255,255,255,0.8); margin-right: 18px; }
+.mb-items { display: flex; gap: 18px; font-size: 12px; color: rgba(255,255,255,0.75); font-weight: 500; }
+.mb-right {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 11px; color: rgba(255,255,255,0.6);
+}
+
+/* ── Floating pill ────────────────────────────────────────────────────────── */
+.pill-wrap {
+  position: absolute;
+  top: 34px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.pill-wrap.visible { opacity: 1; }
+
+.pill {
+  background: rgba(0,0,0,0.78);
+  border-radius: 22px;
+  padding: 10px 16px;
+  border: 0.5px solid rgba(255,255,255,0.18);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+  transition: box-shadow 0.4s ease, border-color 0.4s ease;
+  display: flex; align-items: center; overflow: hidden;
+}
+.pill.glow {
+  border-color: rgba(0,190,154,0.8);
+  box-shadow: 0 0 18px rgba(0,190,154,0.45), 0 8px 28px rgba(0,0,0,0.5);
+}
+
+#stateRec { display: flex; align-items: center; gap: 10px; width: 240px; }
+.rec-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #ff3b30; flex-shrink: 0;
+  animation: pulse 0.6s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+.rec-timer {
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 14px; color: rgba(255,255,255,0.9);
+  min-width: 34px; letter-spacing: 0.02em;
+}
+.waveform-wrap { flex: 1; height: 20px; position: relative; }
+canvas#wave { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.ctx-icon {
+  background: rgba(0,122,255,0.15);
+  border-radius: 20px; padding: 4px 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+#stateProc { display: none; align-items: center; gap: 10px; width: 230px; justify-content: center; }
+.spinner {
+  width: 14px; height: 14px;
+  border: 1.5px solid rgba(255,255,255,0.18);
+  border-top-color: rgba(255,255,255,0.85);
+  border-radius: 50%; animation: spin 0.75s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.proc-text { font-size: 13px; color: rgba(255,255,255,0.55); }
+
+#stateRes { display: none; flex-direction: column; gap: 5px; width: 290px; }
+.res-header { display: flex; align-items: center; gap: 5px; font-size: 11px; color: rgba(255,255,255,0.45); }
+.res-check { color: #30d158; font-size: 12px; }
+.res-tag { margin-left: auto; background: rgba(255,255,255,0.08); padding: 2px 7px; border-radius: 10px; font-size: 10px; }
+.res-body { font-size: 12px; color: rgba(255,255,255,0.82); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ── VS Code window ───────────────────────────────────────────────────────── */
+.vscode-win {
+  position: absolute;
+  top: 34px; left: 16px; right: 16px; bottom: 12px;
+  background: #1e1e1e;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.06);
+  display: flex; flex-direction: column;
+}
+
+.win-titlebar {
+  height: 30px;
+  background: #323233;
+  display: flex; align-items: center;
+  padding: 0 12px; gap: 7px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(0,0,0,0.35);
+  position: relative;
+}
+.tl { width: 12px; height: 12px; border-radius: 50%; }
+.tl-r { background: #ff5f57; }
+.tl-y { background: #febc2e; }
+.tl-g { background: #28c840; }
+.win-title-center {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  font-size: 12px; color: rgba(255,255,255,0.35);
+  pointer-events: none; white-space: nowrap;
+}
+
+.vscode-body { flex: 1; display: flex; overflow: hidden; }
+
+/* Activity bar */
+.activity-bar {
+  width: 36px; background: #333333;
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: 4px; gap: 2px; flex-shrink: 0;
+}
+.act-icon {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0.38; border-radius: 4px;
+}
+.act-icon.active { opacity: 0.88; background: rgba(255,255,255,0.07); }
+.act-icon svg { width: 16px; height: 16px; }
+
+/* Sidebar */
+.sidebar {
+  width: 134px; background: #252526;
+  border-right: 1px solid rgba(0,0,0,0.25);
+  flex-shrink: 0; overflow: hidden;
+}
+.sidebar-header {
+  padding: 8px 10px 5px;
+  font-size: 10px; font-weight: 600;
+  color: rgba(255,255,255,0.28); letter-spacing: 0.08em; text-transform: uppercase;
+}
+.sidebar-dir {
+  padding: 2px 8px; color: rgba(255,255,255,0.62);
+  font-size: 11.5px; font-weight: 500; cursor: default;
+  display: flex; align-items: center; gap: 3px;
+}
+.sidebar-item {
+  padding: 2px 8px 2px 22px;
+  color: rgba(255,255,255,0.48); cursor: default; font-size: 11.5px;
+}
+.sidebar-item.active { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+
+/* Editor */
+.editor { flex: 1; display: flex; flex-direction: column; background: #1e1e1e; overflow: hidden; min-width: 0; }
+.tab-bar {
+  height: 30px; background: #2d2d2d;
+  display: flex; align-items: stretch;
+  border-bottom: 1px solid rgba(0,0,0,0.3); flex-shrink: 0;
+}
+.tab {
+  padding: 0 14px; display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: rgba(255,255,255,0.38);
+  border-right: 1px solid rgba(0,0,0,0.18);
+}
+.tab.active { background: #1e1e1e; color: rgba(255,255,255,0.85); border-top: 1px solid #007acc; }
+
+.code-area {
+  flex: 1; overflow: hidden; padding: 8px 0;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+  font-size: 12px; line-height: 1.65; color: #d4d4d4;
+}
+.code-line { display: flex; padding-right: 12px; min-height: 20px; }
+.ln { min-width: 38px; text-align: right; padding-right: 14px; color: rgba(255,255,255,0.18); user-select: none; flex-shrink: 0; }
+.code-text { white-space: pre; }
+
+.kw   { color: #569cd6; }
+.fn   { color: #dcdcaa; }
+.tp   { color: #4ec9b0; }
+.str  { color: #ce9178; }
+.cmt  { color: #6a9955; }
+.prop { color: #9cdcfe; }
+
+/* VS Code status bar */
+.vscode-status {
+  height: 20px; background: #007acc;
+  display: flex; align-items: center;
+  padding: 0 10px; gap: 14px;
+  font-size: 11px; color: rgba(255,255,255,0.88);
+  flex-shrink: 0;
+}
+.status-right { margin-left: auto; display: flex; gap: 14px; }
+
+/* Divider */
+.pane-div { width: 1px; background: rgba(0,0,0,0.5); flex-shrink: 0; }
+
+/* ── Claude Code panel ────────────────────────────────────────────────────── */
+.claude-panel {
+  width: 282px; background: #0d1117;
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.claude-header {
+  height: 30px; background: #161b22;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; padding: 0 12px; gap: 8px; flex-shrink: 0;
+}
+.cl-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #30d158; }
+.cl-header-title { font-size: 11px; color: rgba(255,255,255,0.36); font-family: 'SF Mono', 'Menlo', monospace; }
+.cl-badge { margin-left: auto; font-size: 9px; color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; }
+
+.claude-session {
+  flex: 1; overflow-y: auto; padding: 10px 12px;
+  font-size: 12px; line-height: 1.55; color: rgba(255,255,255,0.65);
+  scrollbar-width: none;
+}
+.claude-session::-webkit-scrollbar { display: none; }
+
+.cl-prompt {
+  display: flex; gap: 6px; margin-bottom: 5px;
+  color: rgba(255,255,255,0.82); font-size: 11.5px;
+  font-family: 'SF Mono', 'Menlo', monospace;
+}
+.cl-chev { color: rgba(255,255,255,0.26); flex-shrink: 0; }
+.cl-tool { display: flex; gap: 5px; margin: 1px 0; font-size: 10.5px; font-family: 'SF Mono', 'Menlo', monospace; }
+.cl-bullet { color: #ff9500; flex-shrink: 0; }
+.cl-toolname { color: rgba(255,165,0,0.68); }
+.cl-response {
+  color: rgba(255,255,255,0.7);
+  margin: 8px 0 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  font-size: 12px; line-height: 1.6;
+}
+.cl-sep { border: none; border-top: 1px solid rgba(255,255,255,0.05); margin: 6px 0; }
+
+.claude-input-wrap { border-top: 1px solid rgba(255,255,255,0.06); padding: 8px 10px; flex-shrink: 0; }
+.claude-input-display {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; padding: 7px 10px;
+  font-size: 11px; font-family: 'SF Mono', 'Menlo', monospace;
+  color: rgba(255,255,255,0.82); line-height: 1.5;
+  word-break: break-word; white-space: pre-wrap;
+  min-height: 30px;
+}
+.input-cursor {
+  display: inline-block;
+  width: 7px; height: 13px;
+  background: rgba(255,255,255,0.85);
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  animation: cursorBlink 1s steps(1) infinite;
+}
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.input-placeholder { color: rgba(255,255,255,0.22); }
+</style>
+</head>
+<body>
+
+<div class="screen">
+
+  <!-- Menu bar -->
+  <div class="menu-bar">
+    <span class="mb-apple">&#xF8FF;</span>
+    <div class="mb-items">
+      <span>Code</span><span>File</span><span>Edit</span><span>View</span>
+    </div>
+    <div class="mb-right">
+      <svg width="27" height="13" viewBox="0 0 27 13" fill="none" style="opacity:0.72">
+        <rect x="0.6" y="1.8" width="21.8" height="9.4" rx="2.6" stroke="white" stroke-width="1.1"/>
+        <rect x="23" y="4.2" width="2.8" height="4.6" rx="1.3" fill="white" opacity="0.5"/>
+        <rect x="2.2" y="3.4" width="15.6" height="6.2" rx="1.4" fill="white"/>
+      </svg>
+      <svg width="14" height="11" viewBox="0 3 20 15" fill="white" style="opacity:0.75">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M0.675986 6.94117C3.03728 4.51116 6.34284 3 10 3C13.6572 3 16.9628 4.51116 19.3241 6.94117C19.6098 7.23522 19.6064 7.70424 19.3165 7.99417L18.9629 8.34776C18.8209 8.48979 18.6278 8.56891 18.427 8.56741C18.2261 8.56591 18.0343 8.48391 17.8944 8.33977C15.8944 6.27907 13.0973 5 10 5C6.90281 5 4.10564 6.27907 2.10566 8.33977C1.96577 8.48391 1.77392 8.56591 1.57307 8.56741C1.37222 8.56891 1.17916 8.48979 1.03713 8.34776L0.683537 7.99417C0.39361 7.70424 0.390247 7.23522 0.675986 6.94117ZM3.50123 9.77378C5.13848 8.06527 7.44548 7 10 7C12.5546 7 14.8616 8.06527 16.4988 9.77378C16.7811 10.0684 16.7762 10.5345 16.4877 10.823L16.134 11.1767C15.9913 11.3194 15.797 11.3986 15.5952 11.3963C15.3933 11.394 15.2009 11.3104 15.0615 11.1645C13.786 9.82985 11.9906 9 10 9C8.00951 9 6.21406 9.82985 4.93858 11.1645C4.79912 11.3104 4.60672 11.394 4.40487 11.3963C4.20302 11.3986 4.00877 11.3194 3.86604 11.1767L3.5124 10.823C3.22391 10.5345 3.21894 10.0684 3.50123 9.77378ZM6.32061 12.6144C7.23335 11.6229 8.5445 11 10 11C11.4556 11 12.7667 11.6229 13.6794 12.6144C13.9518 12.9103 13.9423 13.3683 13.658 13.6527L13.3041 14.0066C13.1591 14.1516 12.9611 14.2309 12.7562 14.2261C12.5512 14.2213 12.3572 14.1328 12.2192 13.9812C11.6694 13.3773 10.8793 13 10 13C9.12075 13 8.33066 13.3773 7.7809 13.9812C7.64289 14.1328 7.44884 14.2213 7.24388 14.2261C7.03893 14.2309 6.84094 14.1516 6.69598 14.0066L6.34208 13.6527C6.05771 13.3683 6.04824 12.9103 6.32061 12.6144ZM9.11615 15.3661C9.34153 15.1407 9.65506 15 10 15C10.345 15 10.6585 15.1407 10.8839 15.3661C11.1768 15.659 11.1768 16.1339 10.8839 16.4268L10.5304 16.7803C10.2375 17.0732 9.76259 17.0732 9.4697 16.7803L9.11615 16.4268C8.82325 16.1339 8.82325 15.659 9.11615 15.3661Z"/>
+      </svg>
+      <span>Mon 9:41 AM</span>
+    </div>
+  </div>
+
+  <!-- Floating pill -->
+  <div class="pill-wrap" id="pillWrap">
+    <div class="pill" id="pill">
+      <div id="stateRec">
+        <div class="rec-dot"></div>
+        <span class="rec-timer" id="recTimer">0:00</span>
+        <div class="waveform-wrap"><canvas id="wave"></canvas></div>
+        <div class="ctx-icon">
+          <svg width="13" height="13" viewBox="0 0 56.16015625 54.333984375" fill="none">
+            <g transform="scale(1,-1) translate(0,-54.333984375)">
+              <path fill="#007AFF" stroke="none" d="M 16.048828125,6.466796875 C 16.392578125,6.466796875 16.693359375,6.681640625 16.97265625,6.91796875 L 24.79296875,13.556640625 L 42.990234375,13.556640625 C 47.673828125,13.556640625 50.681640625,16.62890625 50.681640625,21.26953125 L 50.681640625,40.17578125 C 50.681640625,44.794921875 47.673828125,47.8671875 42.990234375,47.8671875 L 13.169921875,47.8671875 C 8.486328125,47.8671875 5.478515625,44.859375 5.478515625,40.17578125 L 5.478515625,21.26953125 C 5.478515625,16.564453125 8.486328125,13.556640625 13.169921875,13.556640625 L 15.25390625,13.556640625 L 15.25390625,7.369140625 C 15.25390625,6.810546875 15.59765625,6.466796875 16.048828125,6.466796875 Z M 15.51171875,38.02734375 C 15.189453125,38.02734375 14.931640625,38.263671875 14.931640625,38.62890625 C 14.931640625,38.951171875 15.189453125,39.208984375 15.51171875,39.208984375 L 40.6484375,39.208984375 C 40.970703125,39.208984375 41.25,38.951171875 41.25,38.62890625 C 41.25,38.263671875 40.970703125,38.02734375 40.6484375,38.02734375 Z M 15.51171875,30.3359375 C 15.189453125,30.3359375 14.931640625,30.59375 14.931640625,30.916015625 C 14.931640625,31.23828125 15.189453125,31.49609375 15.51171875,31.49609375 L 40.6484375,31.49609375 C 40.970703125,31.49609375 41.25,31.23828125 41.25,30.916015625 C 41.25,30.59375 40.970703125,30.3359375 40.6484375,30.3359375 Z M 15.51171875,22.6015625 C 15.189453125,22.6015625 14.931640625,22.859375 14.931640625,23.181640625 C 14.931640625,23.525390625 15.189453125,23.76171875 15.51171875,23.76171875 L 32.2265625,23.76171875 C 32.548828125,23.76171875 32.828125,23.525390625 32.828125,23.181640625 C 32.828125,22.859375 32.548828125,22.6015625 32.2265625,22.6015625 Z"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+      <div id="stateProc">
+        <div class="spinner"></div>
+        <span class="proc-text">Processing…</span>
+      </div>
+      <div id="stateRes">
+        <div class="res-header">
+          <span class="res-check">✓</span>
+          <span>Pasted</span>
+          <span class="res-tag">General</span>
+        </div>
+        <div class="res-body" id="resBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VS Code window -->
+  <div class="vscode-win">
+    <div class="win-titlebar">
+      <div class="tl tl-r"></div>
+      <div class="tl tl-y"></div>
+      <div class="tl tl-g"></div>
+      <span class="win-title-center">users.ts — myproject</span>
+    </div>
+
+    <div class="vscode-body">
+
+      <!-- Activity bar -->
+      <div class="activity-bar">
+        <div class="act-icon active">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9L13 2z" stroke="rgba(255,255,255,0.85)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="13 2 13 9 20 9" stroke="rgba(255,255,255,0.85)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="act-icon">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="7" stroke="rgba(255,255,255,0.6)" stroke-width="1.6"/>
+            <line x1="16.5" y1="16.5" x2="22" y2="22" stroke="rgba(255,255,255,0.6)" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="act-icon">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="5" cy="6" r="2.2" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+            <circle cx="19" cy="6" r="2.2" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+            <circle cx="5" cy="18" r="2.2" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+            <path d="M5 8.2v7.6M7.2 6h9.6" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="act-icon">
+          <svg viewBox="0 0 24 24" fill="none">
+            <rect x="2.5" y="2.5" width="8" height="8" rx="1.2" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+            <rect x="13.5" y="2.5" width="8" height="8" rx="1.2" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+            <rect x="2.5" y="13.5" width="8" height="8" rx="1.2" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+            <rect x="13.5" y="13.5" width="8" height="8" rx="1.2" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-header">Explorer</div>
+        <div class="sidebar-dir">▾ myproject</div>
+        <div class="sidebar-dir" style="padding-left:18px">▾ src</div>
+        <div class="sidebar-dir" style="padding-left:28px">▾ api</div>
+        <div class="sidebar-item active" style="padding-left:36px">users.ts</div>
+        <div class="sidebar-item" style="padding-left:36px">auth.ts</div>
+        <div class="sidebar-dir" style="padding-left:28px">▸ middleware</div>
+        <div class="sidebar-item" style="padding-left:28px">types.ts</div>
+        <div class="sidebar-item" style="padding-left:28px">index.ts</div>
+        <div class="sidebar-item" style="padding-left:18px">package.json</div>
+        <div class="sidebar-item" style="padding-left:18px">tsconfig.json</div>
+      </div>
+
+      <!-- Editor -->
+      <div class="editor">
+        <div class="tab-bar">
+          <div class="tab active"><span>users.ts</span></div>
+          <div class="tab"><span>types.ts</span></div>
+        </div>
+        <div class="code-area">
+          <div class="code-line"><span class="ln">1</span><span class="code-text cmt">// src/api/users.ts</span></div>
+          <div class="code-line"><span class="ln">2</span><span class="code-text"></span></div>
+          <div class="code-line"><span class="ln">3</span><span class="code-text"><span class="kw">import</span> { <span class="kw">type</span> <span class="tp">User</span> } <span class="kw">from</span> <span class="str">'../types'</span>;</span></div>
+          <div class="code-line"><span class="ln">4</span><span class="code-text"></span></div>
+          <div class="code-line"><span class="ln">5</span><span class="code-text"><span class="kw">const</span> <span class="prop">BASE</span> = <span class="str">'/api/users'</span>;</span></div>
+          <div class="code-line"><span class="ln">6</span><span class="code-text"></span></div>
+          <div class="code-line"><span class="ln">7</span><span class="code-text"><span class="kw">export async function</span> <span class="fn">fetchUser</span>(</span></div>
+          <div class="code-line"><span class="ln">8</span><span class="code-text">  <span class="prop">id</span>: <span class="tp">string</span></span></div>
+          <div class="code-line"><span class="ln">9</span><span class="code-text">): <span class="tp">Promise</span>&lt;<span class="tp">User</span>&gt; {</span></div>
+          <div class="code-line"><span class="ln">10</span><span class="code-text">  <span class="kw">const</span> <span class="prop">res</span> = <span class="kw">await</span> <span class="fn">fetch</span>(`${<span class="prop">BASE</span>}/${<span class="prop">id</span>}`);</span></div>
+          <div class="code-line"><span class="ln">11</span><span class="code-text">  <span class="kw">return</span> <span class="prop">res</span>.<span class="fn">json</span>();</span></div>
+          <div class="code-line"><span class="ln">12</span><span class="code-text">}</span></div>
+          <div class="code-line"><span class="ln">13</span><span class="code-text"></span></div>
+          <div class="code-line"><span class="ln">14</span><span class="code-text"><span class="kw">export async function</span> <span class="fn">updateUser</span>(</span></div>
+          <div class="code-line"><span class="ln">15</span><span class="code-text">  <span class="prop">id</span>: <span class="tp">string</span>,</span></div>
+          <div class="code-line"><span class="ln">16</span><span class="code-text">  <span class="prop">patch</span>: <span class="tp">Partial</span>&lt;<span class="tp">User</span>&gt;</span></div>
+          <div class="code-line"><span class="ln">17</span><span class="code-text">): <span class="tp">Promise</span>&lt;<span class="tp">User</span>&gt; {</span></div>
+          <div class="code-line"><span class="ln">18</span><span class="code-text">  <span class="kw">const</span> <span class="prop">res</span> = <span class="kw">await</span> <span class="fn">fetch</span>(</span></div>
+          <div class="code-line"><span class="ln">19</span><span class="code-text">    `${<span class="prop">BASE</span>}/${<span class="prop">id</span>}`, {</span></div>
+          <div class="code-line"><span class="ln">20</span><span class="code-text">      <span class="prop">method</span>: <span class="str">'PATCH'</span>,</span></div>
+          <div class="code-line"><span class="ln">21</span><span class="code-text">      <span class="prop">headers</span>: {</span></div>
+          <div class="code-line"><span class="ln">22</span><span class="code-text">        <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span>,</span></div>
+          <div class="code-line"><span class="ln">23</span><span class="code-text">      },</span></div>
+          <div class="code-line"><span class="ln">24</span><span class="code-text">      <span class="prop">body</span>: <span class="fn">JSON</span>.<span class="fn">stringify</span>(<span class="prop">patch</span>),</span></div>
+          <div class="code-line"><span class="ln">25</span><span class="code-text">    }</span></div>
+          <div class="code-line"><span class="ln">26</span><span class="code-text">  );</span></div>
+          <div class="code-line"><span class="ln">27</span><span class="code-text">  <span class="kw">return</span> <span class="prop">res</span>.<span class="fn">json</span>();</span></div>
+          <div class="code-line"><span class="ln">28</span><span class="code-text">}</span></div>
+        </div>
+      </div>
+
+      <!-- Pane divider -->
+      <div class="pane-div"></div>
+
+      <!-- Claude Code panel -->
+      <div class="claude-panel">
+        <div class="claude-header">
+          <div class="cl-status-dot"></div>
+          <span class="cl-header-title">claude</span>
+          <span class="cl-badge">claude-sonnet-4-5</span>
+        </div>
+        <div class="claude-session" id="claudeSession">
+          <div class="cl-prompt">
+            <span class="cl-chev">›</span>
+            <span>What does fetchUser do?</span>
+          </div>
+          <div class="cl-tool">
+            <span class="cl-bullet">●</span>
+            <span class="cl-toolname">Read(src/api/users.ts)</span>
+          </div>
+          <div class="cl-response">
+            Fetches a user by ID via GET /api/users/{id} and returns the parsed JSON. No error handling — network failures will throw.
+          </div>
+          <hr class="cl-sep">
+        </div>
+        <div class="claude-input-wrap">
+          <div class="claude-input-display" id="claudeInputDisplay"><span id="claudeInputText"></span><span id="claudeInputPlaceholder" class="input-placeholder">Ask claude...</span><span class="input-cursor"></span></div>
+        </div>
+      </div>
+
+    </div><!-- vscode-body -->
+
+    <div class="vscode-status">
+      <span>⎇ main</span>
+      <span>◯ 0</span>
+      <div class="status-right">
+        <span>Ln 10, Col 1</span>
+        <span>TypeScript</span>
+      </div>
+    </div>
+  </div><!-- vscode-win -->
+
+</div><!-- screen -->
+
+<script>
+// ── Canvas ─────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('wave');
+const wrapEl = canvas.parentElement;
+const dpr    = window.devicePixelRatio || 1;
+
+function resizeCanvas() {
+  const r = wrapEl.getBoundingClientRect();
+  canvas.width  = r.width  * dpr;
+  canvas.height = r.height * dpr;
+}
+resizeCanvas();
+const ctx = canvas.getContext('2d');
+ctx.scale(dpr, dpr);
+
+// ── Waveform ───────────────────────────────────────────────────────────────
+const WAVES = [
+  { r:   0, g: 0x62, b: 0x55, scale: 0.50, opacity: 0.28 },
+  { r:   0, g: 0x78, b: 0x66, scale: 0.65, opacity: 0.38 },
+  { r:   0, g: 0x98, b: 0x80, scale: 0.82, opacity: 0.52 },
+  { r:   0, g: 0xBE, b: 0x9A, scale: 1.00, opacity: 0.60 },
+];
+
+let smoothLevel = 0, targetLevel = 0;
+let waveRunning = false, rafId = null, waveT0 = null;
+
+function drawWave(ts) {
+  if (!waveT0) waveT0 = ts;
+  const t = (ts - waveT0) / 1000;
+  const W = wrapEl.getBoundingClientRect().width;
+  const H = wrapEl.getBoundingClientRect().height;
+  ctx.clearRect(0, 0, W, H);
+
+  const w = targetLevel > smoothLevel ? 0.18 : 0.25;
+  smoothLevel = Math.min(0.6, smoothLevel * (1 - w) + targetLevel * w);
+  const cy = H / 2;
+
+  WAVES.forEach((wave, i) => {
+    const phase = t * 2.0 + i * 0.7;
+    const freq  = 1.8 + i * 0.4;
+    const amp   = cy * 1.6 * wave.scale * (0.05 + smoothLevel * 0.95);
+    const color = `rgb(${wave.r},${wave.g},${wave.b})`;
+
+    ctx.beginPath();
+    ctx.globalAlpha = wave.opacity;
+    ctx.strokeStyle = color; ctx.lineWidth = 1.2;
+    ctx.lineCap = ctx.lineJoin = 'round';
+    for (let x = 0; x <= W; x += 0.5) {
+      const p = x / W;
+      const y = cy + Math.sin(phase + p * freq * Math.PI * 2) * amp * Math.sin(p * Math.PI);
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    ctx.beginPath(); ctx.lineWidth = 0.6;
+    for (let x = 0; x <= W; x += 0.5) {
+      const p = x / W;
+      const y = cy - Math.sin(phase + p * freq * Math.PI * 2) * amp * 0.5 * Math.sin(p * Math.PI);
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    if (i === WAVES.length - 1) {
+      ctx.beginPath(); ctx.lineWidth = 3; ctx.globalAlpha = 0.10;
+      for (let x = 0; x <= W; x += 0.5) {
+        const p = x / W;
+        const y = cy + Math.sin(phase + p * freq * Math.PI * 2) * amp * Math.sin(p * Math.PI);
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  });
+
+  ctx.globalAlpha = 1;
+  if (waveRunning) rafId = requestAnimationFrame(drawWave);
+}
+
+function startWave() { waveRunning = true; waveT0 = null; rafId = requestAnimationFrame(drawWave); }
+function stopWave()  {
+  waveRunning = false; cancelAnimationFrame(rafId);
+  const W = wrapEl.getBoundingClientRect().width;
+  const H = wrapEl.getBoundingClientRect().height;
+  ctx.clearRect(0, 0, W, H);
+}
+
+// ── Voice simulation ───────────────────────────────────────────────────────
+let levelIv;
+function startVoice() {
+  let tick = 0;
+  levelIv = setInterval(() => {
+    tick++;
+    if (tick < 10) {
+      targetLevel = (tick / 10) * 0.52;
+    } else {
+      const base  = 0.38 + Math.sin(tick * 0.28) * 0.14;
+      const noise = (Math.random() - 0.5) * 0.22;
+      targetLevel = Math.max(0.04, Math.min(0.82, base + noise));
+    }
+  }, 100);
+}
+function stopVoice() { clearInterval(levelIv); targetLevel = 0; }
+
+// ── Timer ──────────────────────────────────────────────────────────────────
+let timerIv, timerSec = 0;
+const timerEl = document.getElementById('recTimer');
+function startTimer() {
+  timerSec = 0; timerEl.textContent = '0:00';
+  timerIv = setInterval(() => {
+    timerSec++;
+    timerEl.textContent = `${Math.floor(timerSec/60)}:${(timerSec%60).toString().padStart(2,'0')}`;
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerIv); }
+
+// ── Pill ───────────────────────────────────────────────────────────────────
+const pillWrap  = document.getElementById('pillWrap');
+const pillEl    = document.getElementById('pill');
+const stateRec  = document.getElementById('stateRec');
+const stateProc = document.getElementById('stateProc');
+const stateRes  = document.getElementById('stateRes');
+function showPill() { pillWrap.classList.add('visible'); }
+function hidePill() { pillWrap.classList.remove('visible'); }
+function setState(name) {
+  stateRec.style.display  = name === 'rec'  ? 'flex' : 'none';
+  stateProc.style.display = name === 'proc' ? 'flex' : 'none';
+  stateRes.style.display  = name === 'res'  ? 'flex' : 'none';
+  pillEl.classList.toggle('glow', name === 'proc');
+}
+
+// ── Claude Code helpers ────────────────────────────────────────────────────
+const sessionEl          = document.getElementById('claudeSession');
+const claudeInputEl      = document.getElementById('claudeInputText');
+const claudeInputBox     = document.getElementById('claudeInputDisplay');
+const claudePlaceholder  = document.getElementById('claudeInputPlaceholder');
+
+const DEMO_TEXT = "Refactor fetchUser to add error handling and retry logic with exponential backoff";
+
+const CLAUDE_RESPONSE = "I'll wrap the fetch call in try/catch and add retry logic with exponential backoff. Updating src/api/users.ts now…";
+
+let typewriterIv = null;
+let addedEls = [];
+
+function pasteToInput(text) {
+  claudeInputEl.textContent = '';
+  claudePlaceholder.style.display = 'none';
+  claudeInputBox.style.transition = 'background 0.08s ease';
+  claudeInputBox.style.background = 'rgba(255,255,255,0.12)';
+  setTimeout(() => {
+    claudeInputBox.style.background = '';
+    claudeInputEl.textContent = text;
+  }, 80);
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function submitPrompt() {
+  const text = claudeInputEl.textContent;
+  claudeInputEl.textContent = '';
+  claudePlaceholder.style.display = '';
+
+  const d = document.createElement('div');
+  d.className = 'cl-prompt';
+  d.innerHTML = `<span class="cl-chev">›</span><span>${esc(text)}</span>`;
+  d.style.opacity = '0'; d.style.transition = 'opacity 0.2s';
+  sessionEl.appendChild(d);
+  addedEls.push(d);
+  sessionEl.scrollTop = sessionEl.scrollHeight;
+  requestAnimationFrame(() => { d.style.opacity = '1'; });
+}
+
+function showClaudeResponse() {
+  // Tool use line
+  const toolD = document.createElement('div');
+  toolD.className = 'cl-tool';
+  toolD.innerHTML = '<span class="cl-bullet">●</span><span class="cl-toolname">Edit(src/api/users.ts)</span>';
+  toolD.style.opacity = '0'; toolD.style.transition = 'opacity 0.2s';
+  sessionEl.appendChild(toolD);
+  addedEls.push(toolD);
+  sessionEl.scrollTop = sessionEl.scrollHeight;
+
+  setTimeout(() => {
+    toolD.style.opacity = '1';
+    sessionEl.scrollTop = sessionEl.scrollHeight;
+
+    // Typewriter response
+    const respD = document.createElement('div');
+    respD.className = 'cl-response';
+    sessionEl.appendChild(respD);
+    addedEls.push(respD);
+
+    let i = 0;
+    typewriterIv = setInterval(() => {
+      i++;
+      respD.textContent = CLAUDE_RESPONSE.slice(0, i);
+      sessionEl.scrollTop = sessionEl.scrollHeight;
+      if (i >= CLAUDE_RESPONSE.length) {
+        clearInterval(typewriterIv);
+        typewriterIv = null;
+      }
+    }, 28);
+  }, 550);
+}
+
+function clearAdded() {
+  addedEls.forEach(el => el.remove());
+  addedEls = [];
+}
+
+// ── Demo sequencer ─────────────────────────────────────────────────────────
+const timeouts = [];
+function after(ms, fn) { timeouts.push(setTimeout(fn, ms)); }
+function clearAll() {
+  timeouts.forEach(clearTimeout); timeouts.length = 0;
+  clearInterval(levelIv);
+  if (typewriterIv) { clearInterval(typewriterIv); typewriterIv = null; }
+}
+
+function runDemo() {
+  clearAll();
+
+  hidePill(); setState('rec');
+  stopTimer(); stopWave(); stopVoice();
+  smoothLevel = 0; targetLevel = 0;
+  claudeInputEl.textContent = '';
+  claudePlaceholder.style.display = '';
+  clearAdded();
+  document.getElementById('resBody').textContent = '';
+
+  // Recording
+  after(1000, () => { setState('rec'); showPill(); startTimer(); startWave(); startVoice(); });
+
+  // Processing
+  after(5000, () => { stopTimer(); stopVoice(); targetLevel = 0; setState('proc'); });
+
+  // Result
+  after(6500, () => { stopWave(); smoothLevel = 0; document.getElementById('resBody').textContent = DEMO_TEXT; setState('res'); });
+
+  // Paste into Claude input
+  after(7000, () => { pasteToInput(DEMO_TEXT); });
+
+  // Submit → Claude responds
+  after(9200, () => {
+    hidePill();
+    submitPrompt();
+    after(300, showClaudeResponse);
+  });
+
+  // Loop
+  after(17000, runDemo);
+}
+
+setTimeout(runDemo, 600);
+</script>
+</body>
+</html>

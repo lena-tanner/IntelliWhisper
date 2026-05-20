@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IntelliWhisper Demo — Email</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  background: #0d0d0f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+/* ── Screen ───────────────────────────────────────────────────────────────── */
+.screen {
+  width: 860px;
+  height: 520px;
+  background: radial-gradient(ellipse at 30% 20%, #1c1035 0%, #0e1520 55%, #0b1018 100%);
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 50px 120px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.06);
+  user-select: none;
+}
+
+/* ── macOS menu bar ───────────────────────────────────────────────────────── */
+.menu-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 26px;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex; align-items: center;
+  padding: 0 14px; z-index: 100;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.mb-apple { font-size: 14px; color: rgba(255,255,255,0.8); margin-right: 18px; }
+.mb-items { display: flex; gap: 18px; font-size: 12px; color: rgba(255,255,255,0.75); font-weight: 500; }
+.mb-right {
+  margin-left: auto; display: flex; align-items: center;
+  gap: 10px; font-size: 11px; color: rgba(255,255,255,0.6);
+}
+
+/* ── Floating pill ────────────────────────────────────────────────────────── */
+.pill-wrap {
+  position: absolute;
+  top: 34px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 200; opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.pill-wrap.visible { opacity: 1; }
+.pill {
+  background: rgba(0,0,0,0.78);
+  border-radius: 22px; padding: 10px 16px;
+  border: 0.5px solid rgba(255,255,255,0.18);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+  transition: box-shadow 0.4s ease, border-color 0.4s ease;
+  display: flex; align-items: center; overflow: hidden;
+}
+.pill.glow {
+  border-color: rgba(0,190,154,0.8);
+  box-shadow: 0 0 18px rgba(0,190,154,0.45), 0 8px 28px rgba(0,0,0,0.5);
+}
+#stateRec { display: flex; align-items: center; gap: 10px; width: 240px; }
+.rec-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #ff3b30; flex-shrink: 0;
+  animation: pulse 0.6s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+.rec-timer {
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 14px; color: rgba(255,255,255,0.9);
+  min-width: 34px; letter-spacing: 0.02em;
+}
+.waveform-wrap { flex: 1; height: 20px; position: relative; }
+canvas#wave { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.ctx-icon {
+  background: rgba(0,122,255,0.15);
+  border-radius: 20px; padding: 4px 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+#stateProc { display: none; align-items: center; gap: 10px; width: 230px; justify-content: center; }
+.spinner {
+  width: 14px; height: 14px;
+  border: 1.5px solid rgba(255,255,255,0.18);
+  border-top-color: rgba(255,255,255,0.85);
+  border-radius: 50%; animation: spin 0.75s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.proc-text { font-size: 13px; color: rgba(255,255,255,0.55); }
+#stateRes { display: none; flex-direction: column; gap: 5px; width: 290px; }
+.res-header { display: flex; align-items: center; gap: 5px; font-size: 11px; color: rgba(255,255,255,0.45); }
+.res-check { color: #30d158; font-size: 12px; }
+.res-tag { margin-left: auto; background: rgba(255,255,255,0.08); padding: 2px 7px; border-radius: 10px; font-size: 10px; }
+.res-body { font-size: 12px; color: rgba(255,255,255,0.82); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ── Chrome window ────────────────────────────────────────────────────────── */
+.chrome-win {
+  position: absolute;
+  top: 34px; left: 16px; right: 16px; bottom: 6px;
+  background: #ffffff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+  border: 1px solid rgba(0,0,0,0.12);
+  display: flex; flex-direction: column;
+}
+
+/* Chrome title bar */
+.chrome-titlebar {
+  height: 28px;
+  background: #e8eaed;
+  display: flex; align-items: flex-end;
+  padding: 0 10px 0 12px;
+  flex-shrink: 0;
+  position: relative;
+}
+.tl { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; margin-bottom: 9px; }
+.tl-r { background: #ff5f57; }
+.tl-y { background: #febc2e; }
+.tl-g { background: #28c840; }
+.tl-group { display: flex; gap: 7px; margin-right: 14px; }
+.chrome-tab {
+  height: 28px;
+  background: #ffffff;
+  border-radius: 8px 8px 0 0;
+  padding: 0 14px;
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; color: #3c4043;
+  max-width: 220px;
+}
+.tab-fav {
+  width: 14px; height: 14px;
+  background: #EA4335;
+  border-radius: 2px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px; font-weight: 900; color: white;
+  flex-shrink: 0;
+}
+.tab-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.tab-close {
+  margin-left: 4px; color: #5f6368; font-size: 13px;
+  display: flex; align-items: center;
+}
+
+/* Gmail top bar */
+.gmail-topbar {
+  height: 42px;
+  background: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex; align-items: center;
+  padding: 0 16px; gap: 10px;
+  flex-shrink: 0;
+}
+.gm-hamburger {
+  width: 34px; height: 34px;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  gap: 5px; border-radius: 50%; cursor: default;
+}
+.gm-hamburger span { width: 18px; height: 2px; background: #5f6368; border-radius: 1px; }
+.gm-logo { display: flex; align-items: baseline; gap: 0; margin-left: 4px; margin-right: 14px; }
+.gm-logo-g { font-size: 20px; font-weight: 400; letter-spacing: -0.5px; }
+.gm-search {
+  flex: 1; max-width: 480px;
+  height: 36px;
+  background: #f1f3f4;
+  border-radius: 22px;
+  display: flex; align-items: center;
+  padding: 0 20px; gap: 10px;
+}
+.gm-search-icon { color: #5f6368; font-size: 14px; }
+.gm-search-text { font-size: 14px; color: #5f6368; flex: 1; }
+.gm-topbar-right { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.gm-icon-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #5f6368; font-size: 16px; cursor: default;
+}
+.gm-avatar {
+  width: 32px; height: 32px;
+  background: #1a73e8;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 500; color: white;
+  margin-left: 6px;
+}
+
+/* Gmail main area */
+.gmail-main { flex: 1; display: flex; overflow: hidden; }
+
+/* Sidebar */
+.gm-sidebar {
+  width: 176px;
+  background: #ffffff;
+  padding: 8px 0;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.gm-compose {
+  margin: 4px 16px 16px;
+  height: 44px;
+  background: #c2e7ff;
+  border-radius: 22px;
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px; cursor: default;
+  font-size: 14px; font-weight: 500; color: #001d35;
+}
+.gm-compose-icon { font-size: 18px; }
+.gm-nav-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: 4px 12px 4px 16px;
+  height: 32px; border-radius: 0 16px 16px 0;
+  margin-right: 16px;
+  cursor: default; font-size: 14px; color: #202124;
+}
+.gm-nav-item.active { background: #d3e3fd; font-weight: 600; }
+.gm-nav-icon { font-size: 16px; color: #444746; width: 20px; text-align: center; }
+.gm-nav-item.active .gm-nav-icon { color: #0b57d0; }
+.gm-nav-count { margin-left: auto; font-size: 12px; color: #444746; font-weight: 600; }
+
+/* Email content area */
+.gm-content {
+  flex: 1; overflow: hidden;
+  display: flex; flex-direction: column;
+  border-left: 1px solid #e0e0e0;
+}
+
+/* Subject + actions bar */
+.email-subject-bar {
+  height: 36px;
+  padding: 0 20px;
+  display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid #e8eaed;
+  flex-shrink: 0;
+}
+.email-back-btn { color: #5f6368; font-size: 18px; cursor: default; }
+.email-subject-title { font-size: 20px; font-weight: 400; color: #202124; flex: 1; }
+.email-actions { display: flex; gap: 4px; }
+.email-action-btn {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #5f6368; font-size: 14px; cursor: default;
+}
+
+/* Email thread area */
+.email-thread { flex: 1; overflow: hidden; padding: 6px 20px 6px; display: flex; flex-direction: column; gap: 0; }
+
+/* Email message */
+.email-message { flex-shrink: 0; }
+.email-msg-header {
+  display: flex; align-items: flex-start; gap: 12px;
+  margin-bottom: 4px;
+}
+.sender-avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: #a142f4;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 500; color: white;
+  flex-shrink: 0;
+}
+.sender-meta { flex: 1; }
+.sender-name-line { font-size: 14px; color: #202124; font-weight: 500; display: flex; align-items: baseline; gap: 6px; }
+.sender-email-addr { font-size: 12px; color: #5f6368; font-weight: 400; }
+.sender-date { font-size: 12px; color: #5f6368; margin-top: 2px; }
+.email-body {
+  font-size: 13px; color: #202124; line-height: 1.4;
+  padding-left: 50px;
+  margin-bottom: 6px;
+}
+
+/* Reply compose box */
+.reply-box {
+  flex-shrink: 0;
+  margin-top: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  overflow: hidden;
+  background: #fff;
+}
+.reply-header {
+  padding: 5px 16px 3px;
+  font-size: 12px; color: #5f6368;
+}
+.reply-header strong { color: #3c4043; font-weight: 500; }
+.reply-compose-area {
+  padding: 2px 16px 6px;
+  font-size: 13px; color: #202124; line-height: 1.4;
+  word-break: break-word; white-space: pre-wrap;
+  font-family: Arial, 'Helvetica Neue', sans-serif;
+}
+.compose-cursor {
+  display: inline-block;
+  width: 1.5px; height: 15px;
+  background: #1a73e8;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  animation: cursorBlink 1s steps(1) infinite;
+}
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.reply-toolbar {
+  border-top: 1px solid #f1f3f4;
+  padding: 5px 12px;
+  display: flex; align-items: center;
+}
+.gm-send-btn {
+  background: #1a73e8;
+  color: white; border: none;
+  border-radius: 4px; padding: 7px 20px;
+  font-size: 13px; font-weight: 500;
+  cursor: default; font-family: inherit;
+  opacity: 0.35;
+  transition: opacity 0.2s;
+}
+.gm-send-btn.active { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="screen">
+
+  <!-- macOS menu bar -->
+  <div class="menu-bar">
+    <span class="mb-apple">&#xF8FF;</span>
+    <div class="mb-items">
+      <span>Chrome</span><span>Ablage</span><span>Bearbeiten</span><span>Darstellung</span>
+    </div>
+    <div class="mb-right">
+      <svg width="27" height="13" viewBox="0 0 27 13" fill="none" style="opacity:0.72">
+        <rect x="0.6" y="1.8" width="21.8" height="9.4" rx="2.6" stroke="white" stroke-width="1.1"/>
+        <rect x="23" y="4.2" width="2.8" height="4.6" rx="1.3" fill="white" opacity="0.5"/>
+        <rect x="2.2" y="3.4" width="15.6" height="6.2" rx="1.4" fill="white"/>
+      </svg>
+      <svg width="14" height="11" viewBox="0 3 20 15" fill="white" style="opacity:0.75">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M0.675986 6.94117C3.03728 4.51116 6.34284 3 10 3C13.6572 3 16.9628 4.51116 19.3241 6.94117C19.6098 7.23522 19.6064 7.70424 19.3165 7.99417L18.9629 8.34776C18.8209 8.48979 18.6278 8.56891 18.427 8.56741C18.2261 8.56591 18.0343 8.48391 17.8944 8.33977C15.8944 6.27907 13.0973 5 10 5C6.90281 5 4.10564 6.27907 2.10566 8.33977C1.96577 8.48391 1.77392 8.56591 1.57307 8.56741C1.37222 8.56891 1.17916 8.48979 1.03713 8.34776L0.683537 7.99417C0.39361 7.70424 0.390247 7.23522 0.675986 6.94117ZM3.50123 9.77378C5.13848 8.06527 7.44548 7 10 7C12.5546 7 14.8616 8.06527 16.4988 9.77378C16.7811 10.0684 16.7762 10.5345 16.4877 10.823L16.134 11.1767C15.9913 11.3194 15.797 11.3986 15.5952 11.3963C15.3933 11.394 15.2009 11.3104 15.0615 11.1645C13.786 9.82985 11.9906 9 10 9C8.00951 9 6.21406 9.82985 4.93858 11.1645C4.79912 11.3104 4.60672 11.394 4.40487 11.3963C4.20302 11.3986 4.00877 11.3194 3.86604 11.1767L3.5124 10.823C3.22391 10.5345 3.21894 10.0684 3.50123 9.77378ZM6.32061 12.6144C7.23335 11.6229 8.5445 11 10 11C11.4556 11 12.7667 11.6229 13.6794 12.6144C13.9518 12.9103 13.9423 13.3683 13.658 13.6527L13.3041 14.0066C13.1591 14.1516 12.9611 14.2309 12.7562 14.2261C12.5512 14.2213 12.3572 14.1328 12.2192 13.9812C11.6694 13.3773 10.8793 13 10 13C9.12075 13 8.33066 13.3773 7.7809 13.9812C7.64289 14.1328 7.44884 14.2213 7.24388 14.2261C7.03893 14.2309 6.84094 14.1516 6.69598 14.0066L6.34208 13.6527C6.05771 13.3683 6.04824 12.9103 6.32061 12.6144ZM9.11615 15.3661C9.34153 15.1407 9.65506 15 10 15C10.345 15 10.6585 15.1407 10.8839 15.3661C11.1768 15.659 11.1768 16.1339 10.8839 16.4268L10.5304 16.7803C10.2375 17.0732 9.76259 17.0732 9.4697 16.7803L9.11615 16.4268C8.82325 16.1339 8.82325 15.659 9.11615 15.3661Z"/>
+      </svg>
+      <span>Mo. 09:41</span>
+    </div>
+  </div>
+
+  <!-- Floating pill -->
+  <div class="pill-wrap" id="pillWrap">
+    <div class="pill" id="pill">
+      <div id="stateRec">
+        <div class="rec-dot"></div>
+        <span class="rec-timer" id="recTimer">0:00</span>
+        <div class="waveform-wrap"><canvas id="wave"></canvas></div>
+        <!-- envelope.fill icon — matches real app email context -->
+        <div class="ctx-icon">
+          <svg width="14" height="11" viewBox="0 0 28 21" fill="none">
+            <rect x="0" y="0" width="28" height="21" rx="3.5" fill="#007AFF"/>
+            <path d="M1 4L14 13L27 4" stroke="rgba(255,255,255,0.92)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+      <div id="stateProc">
+        <div class="spinner"></div>
+        <span class="proc-text">Processing…</span>
+      </div>
+      <div id="stateRes">
+        <div class="res-header">
+          <span class="res-check">✓</span>
+          <span>Pasted</span>
+          <span class="res-tag">Email</span>
+        </div>
+        <div class="res-body" id="resBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chrome + Gmail window -->
+  <div class="chrome-win">
+
+    <!-- Chrome title bar -->
+    <div class="chrome-titlebar">
+      <div class="tl-group">
+        <div class="tl tl-r"></div>
+        <div class="tl tl-y"></div>
+        <div class="tl tl-g"></div>
+      </div>
+      <div class="chrome-tab">
+        <div class="tab-fav">M</div>
+        <span class="tab-title">Posteingang (4)</span>
+        <span class="tab-close">×</span>
+      </div>
+    </div>
+
+    <!-- Gmail top bar -->
+    <div class="gmail-topbar">
+      <div class="gm-hamburger">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="gm-logo" style="display:flex;align-items:center;gap:8px;">
+        <svg width="28" height="22" viewBox="0 0 28 22" fill="none">
+          <rect x="0" y="0" width="28" height="22" rx="3.5" fill="#EA4335"/>
+          <path d="M1 4L14 14L27 4" stroke="rgba(255,255,255,0.9)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span style="font-size:20px;font-weight:400;color:#5f6368;letter-spacing:-0.3px;">Mail</span>
+      </div>
+      <div class="gm-search">
+        <span class="gm-search-icon">&#128269;</span>
+        <span class="gm-search-text">E-Mails durchsuchen</span>
+      </div>
+      <div class="gm-topbar-right">
+        <div class="gm-icon-btn" style="font-size:18px">⠿</div>
+        <div class="gm-avatar">J</div>
+      </div>
+    </div>
+
+    <!-- Main area -->
+    <div class="gmail-main">
+
+      <!-- Sidebar -->
+      <div class="gm-sidebar">
+        <div class="gm-compose">
+          <span class="gm-compose-icon">✏</span>
+          <span>Verfassen</span>
+        </div>
+        <div class="gm-nav-item active">
+          <span class="gm-nav-icon">📥</span>
+          <span>Posteingang</span>
+          <span class="gm-nav-count">4</span>
+        </div>
+        <div class="gm-nav-item">
+          <span class="gm-nav-icon">⭐</span>
+          <span>Markiert</span>
+        </div>
+        <div class="gm-nav-item">
+          <span class="gm-nav-icon">🕐</span>
+          <span>Schlummern</span>
+        </div>
+        <div class="gm-nav-item">
+          <span class="gm-nav-icon">➤</span>
+          <span>Gesendet</span>
+        </div>
+        <div class="gm-nav-item">
+          <span class="gm-nav-icon">📄</span>
+          <span>Entwürfe</span>
+          <span class="gm-nav-count">1</span>
+        </div>
+      </div>
+
+      <!-- Email content -->
+      <div class="gm-content">
+
+        <!-- Subject bar -->
+        <div class="email-subject-bar">
+          <span class="email-back-btn">←</span>
+          <span class="email-subject-title">Q4-Partnerschaftsangebot</span>
+        </div>
+
+        <!-- Thread -->
+        <div class="email-thread">
+
+          <!-- Received email -->
+          <div class="email-message">
+            <div class="email-msg-header">
+              <div class="sender-avatar">SC</div>
+              <div class="sender-meta">
+                <div class="sender-name-line">
+                  Sarah Chen
+                  <span class="sender-email-addr">&lt;sarah.chen@acme.com&gt;</span>
+                </div>
+                <div class="sender-date">Mo., 19. Mai, 09:22 Uhr · an mich</div>
+              </div>
+            </div>
+            <div class="email-body">
+              Hallo Julian,<br><br>
+              anbei findest du das aktualisierte Q4-Angebot. Die wichtigsten Änderungen betreffen Abschnitt 3 (Preise) und Abschnitt 5 (Zeitplan). Ich freue mich auf dein Feedback!<br><br>
+              Viele Grüsse, Sarah
+            </div>
+          </div>
+
+          <!-- Reply compose -->
+          <div class="reply-box" id="replyBox">
+            <div class="reply-header">Antworten an <strong>Sarah Chen</strong></div>
+            <div class="reply-compose-area"><span id="replyText"></span><span class="compose-cursor"></span></div>
+            <div class="reply-toolbar">
+              <button class="gm-send-btn" id="sendBtn">Senden</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Canvas ─────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('wave');
+const wrapEl = canvas.parentElement;
+const dpr    = window.devicePixelRatio || 1;
+function resizeCanvas() {
+  const r = wrapEl.getBoundingClientRect();
+  canvas.width  = r.width  * dpr;
+  canvas.height = r.height * dpr;
+}
+resizeCanvas();
+const ctx = canvas.getContext('2d');
+ctx.scale(dpr, dpr);
+
+// ── Waveform ───────────────────────────────────────────────────────────────
+const WAVES = [
+  { r:   0, g: 0x62, b: 0x55, scale: 0.50, opacity: 0.28 },
+  { r:   0, g: 0x78, b: 0x66, scale: 0.65, opacity: 0.38 },
+  { r:   0, g: 0x98, b: 0x80, scale: 0.82, opacity: 0.52 },
+  { r:   0, g: 0xBE, b: 0x9A, scale: 1.00, opacity: 0.60 },
+];
+let smoothLevel = 0, targetLevel = 0;
+let waveRunning = false, rafId = null, waveT0 = null;
+
+function drawWave(ts) {
+  if (!waveT0) waveT0 = ts;
+  const t = (ts - waveT0) / 1000;
+  const W = wrapEl.getBoundingClientRect().width;
+  const H = wrapEl.getBoundingClientRect().height;
+  ctx.clearRect(0, 0, W, H);
+  const w = targetLevel > smoothLevel ? 0.18 : 0.25;
+  smoothLevel = Math.min(0.6, smoothLevel * (1 - w) + targetLevel * w);
+  const cy = H / 2;
+  WAVES.forEach((wave, i) => {
+    const phase = t * 2.0 + i * 0.7;
+    const freq  = 1.8 + i * 0.4;
+    const amp   = cy * 1.6 * wave.scale * (0.05 + smoothLevel * 0.95);
+    const color = `rgb(${wave.r},${wave.g},${wave.b})`;
+    ctx.beginPath();
+    ctx.globalAlpha = wave.opacity; ctx.strokeStyle = color;
+    ctx.lineWidth = 1.2; ctx.lineCap = ctx.lineJoin = 'round';
+    for (let x = 0; x <= W; x += 0.5) {
+      const p = x / W;
+      const y = cy + Math.sin(phase + p * freq * Math.PI * 2) * amp * Math.sin(p * Math.PI);
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.beginPath(); ctx.lineWidth = 0.6;
+    for (let x = 0; x <= W; x += 0.5) {
+      const p = x / W;
+      const y = cy - Math.sin(phase + p * freq * Math.PI * 2) * amp * 0.5 * Math.sin(p * Math.PI);
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    if (i === WAVES.length - 1) {
+      ctx.beginPath(); ctx.lineWidth = 3; ctx.globalAlpha = 0.10;
+      for (let x = 0; x <= W; x += 0.5) {
+        const p = x / W;
+        const y = cy + Math.sin(phase + p * freq * Math.PI * 2) * amp * Math.sin(p * Math.PI);
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  });
+  ctx.globalAlpha = 1;
+  if (waveRunning) rafId = requestAnimationFrame(drawWave);
+}
+function startWave() { waveRunning = true; waveT0 = null; rafId = requestAnimationFrame(drawWave); }
+function stopWave()  {
+  waveRunning = false; cancelAnimationFrame(rafId);
+  ctx.clearRect(0, 0, wrapEl.getBoundingClientRect().width, wrapEl.getBoundingClientRect().height);
+}
+
+// ── Voice simulation ───────────────────────────────────────────────────────
+let levelIv;
+function startVoice() {
+  let tick = 0;
+  levelIv = setInterval(() => {
+    tick++;
+    if (tick < 10) { targetLevel = (tick / 10) * 0.52; }
+    else {
+      const base  = 0.38 + Math.sin(tick * 0.28) * 0.14;
+      const noise = (Math.random() - 0.5) * 0.22;
+      targetLevel = Math.max(0.04, Math.min(0.82, base + noise));
+    }
+  }, 100);
+}
+function stopVoice() { clearInterval(levelIv); targetLevel = 0; }
+
+// ── Timer ──────────────────────────────────────────────────────────────────
+let timerIv, timerSec = 0;
+const timerEl = document.getElementById('recTimer');
+function startTimer() {
+  timerSec = 0; timerEl.textContent = '0:00';
+  timerIv = setInterval(() => {
+    timerSec++;
+    timerEl.textContent = `${Math.floor(timerSec/60)}:${(timerSec%60).toString().padStart(2,'0')}`;
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerIv); }
+
+// ── Pill ───────────────────────────────────────────────────────────────────
+const pillWrap  = document.getElementById('pillWrap');
+const pillEl    = document.getElementById('pill');
+const stateRec  = document.getElementById('stateRec');
+const stateProc = document.getElementById('stateProc');
+const stateRes  = document.getElementById('stateRes');
+function showPill() { pillWrap.classList.add('visible'); }
+function hidePill() { pillWrap.classList.remove('visible'); }
+function setState(name) {
+  stateRec.style.display  = name === 'rec'  ? 'flex' : 'none';
+  stateProc.style.display = name === 'proc' ? 'flex' : 'none';
+  stateRes.style.display  = name === 'res'  ? 'flex' : 'none';
+  pillEl.classList.toggle('glow', name === 'proc');
+}
+
+// ── Reply compose helpers ──────────────────────────────────────────────────
+const replyTextEl = document.getElementById('replyText');
+const replyBoxEl  = document.getElementById('replyBox');
+const sendBtn     = document.getElementById('sendBtn');
+
+const DEMO_TEXT = "Hi Sarah,\n\nich habe das Angebot durchgesehen und alles sieht super aus.\nWürde Dienstag oder Mittwoch nächste Woche für ein kurzes Gespräch über die nächsten Schritte passen?\n\nBeste Grüsse,\nJulian";
+
+function pasteToReply(text) {
+  replyTextEl.textContent = '';
+  sendBtn.classList.remove('active');
+  replyBoxEl.style.transition = 'background 0.08s ease';
+  replyBoxEl.style.background = 'rgba(26,115,232,0.06)';
+  setTimeout(() => {
+    replyBoxEl.style.background = '';
+    replyTextEl.textContent = text;
+    sendBtn.classList.add('active');
+  }, 80);
+}
+
+function resetReply() {
+  replyTextEl.textContent = '';
+  sendBtn.classList.remove('active');
+}
+
+// ── Demo sequencer ─────────────────────────────────────────────────────────
+const timeouts = [];
+function after(ms, fn) { timeouts.push(setTimeout(fn, ms)); }
+function clearAll() {
+  timeouts.forEach(clearTimeout); timeouts.length = 0;
+  clearInterval(levelIv);
+}
+
+function runDemo() {
+  clearAll();
+  hidePill(); setState('rec');
+  stopTimer(); stopWave(); stopVoice();
+  smoothLevel = 0; targetLevel = 0;
+  resetReply();
+  document.getElementById('resBody').textContent = '';
+
+  // Recording
+  after(1000, () => { setState('rec'); showPill(); startTimer(); startWave(); startVoice(); });
+
+  // Processing
+  after(5200, () => { stopTimer(); stopVoice(); targetLevel = 0; setState('proc'); });
+
+  // Result
+  after(7000, () => { stopWave(); smoothLevel = 0; document.getElementById('resBody').textContent = DEMO_TEXT; setState('res'); });
+
+  // Paste into reply field
+  after(7400, () => { pasteToReply(DEMO_TEXT); });
+
+  // Hide pill
+  after(9800, () => { hidePill(); });
+
+  // Loop
+  after(14000, runDemo);
+}
+
+setTimeout(runDemo, 600);
+</script>
+</body>
+</html>

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Waveform Tuner</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: #111;
+  color: #ccc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 40px;
+  padding: 40px;
+}
+
+/* ── Pill preview ─────────────────────────────────────────────────────────── */
+.preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.pill {
+  background: rgba(0,0,0,0.78);
+  border-radius: 22px;
+  padding: 10px 16px;
+  border: 0.5px solid rgba(255,255,255,0.18);
+  backdrop-filter: blur(24px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rec-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #ff3b30;
+  animation: pulse 0.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes pulse { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+.rec-timer {
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 14px;
+  color: rgba(255,255,255,0.9);
+  min-width: 34px;
+}
+
+.waveform-wrap {
+  width: 120px;
+  height: 20px;
+  position: relative;
+}
+
+canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+
+.ctx-icon {
+  background: rgba(0,122,255,0.15);
+  border-radius: 20px;
+  padding: 4px 7px;
+  font-size: 10px;
+}
+
+/* ── Voice level control ──────────────────────────────────────────────────── */
+.voice-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+}
+
+.voice-row input[type=range] { width: 200px; accent-color: #00BE9A; }
+
+/* ── Controls panel ───────────────────────────────────────────────────────── */
+.panel {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 24px 28px;
+  width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.panel h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.wave-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wave-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.swatch {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.wave-label span { flex: 1; color: rgba(255,255,255,0.6); }
+.wave-label .val { min-width: 34px; text-align: right; color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums; }
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+}
+
+.slider-row input[type=range] {
+  flex: 1;
+  accent-color: #00BE9A;
+  height: 3px;
+}
+
+.divider { border: none; border-top: 1px solid rgba(255,255,255,0.07); }
+
+/* ── Glow row ─────────────────────────────────────────────────────────────── */
+.glow-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+}
+.glow-row input[type=range] { flex: 1; accent-color: #00BE9A; }
+.glow-row .val { min-width: 34px; text-align: right; color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums; }
+
+/* ── Output ───────────────────────────────────────────────────────────────── */
+.output-wrap { display: flex; flex-direction: column; gap: 8px; }
+
+pre {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Menlo', monospace;
+  color: #7ec8a0;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+button {
+  align-self: flex-end;
+  background: rgba(0,190,154,0.15);
+  border: 1px solid rgba(0,190,154,0.3);
+  color: #00BE9A;
+  font-size: 12px;
+  font-family: inherit;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+button:hover { background: rgba(0,190,154,0.25); }
+button.copied { background: rgba(0,190,154,0.3); color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- Preview -->
+<div class="preview">
+  <div class="pill">
+    <div class="rec-dot"></div>
+    <span class="rec-timer">0:04</span>
+    <div class="waveform-wrap">
+      <canvas id="wave"></canvas>
+    </div>
+    <div class="ctx-icon">💬</div>
+  </div>
+
+  <div class="voice-row">
+    <span>Voice level</span>
+    <input type="range" id="voiceLevel" min="0" max="100" value="55">
+    <span id="voiceVal">55%</span>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="panel">
+  <h2>Wave opacities</h2>
+
+  <div id="waveControls"></div>
+
+  <hr class="divider">
+
+  <div class="glow-row">
+    <span>Glow (brightest layer)</span>
+    <input type="range" id="glowSlider" min="0" max="50" value="10">
+    <span class="val" id="glowVal">0.10</span>
+  </div>
+
+  <hr class="divider">
+
+  <div class="output-wrap">
+    <h2>Current values</h2>
+    <pre id="output"></pre>
+    <button id="copyBtn">Copy to clipboard</button>
+  </div>
+</div>
+
+<script>
+// ── Wave definitions (colors fixed, opacity tunable) ───────────────────────
+const WAVES = [
+  { r: 0, g: 0x62, b: 0x55, scale: 0.50, opacity: 0.28 },
+  { r: 0, g: 0x78, b: 0x66, scale: 0.65, opacity: 0.38 },
+  { r: 0, g: 0x98, b: 0x80, scale: 0.82, opacity: 0.52 },
+  { r: 0, g: 0xBE, b: 0x9A, scale: 1.00, opacity: 0.68 },
+];
+let glowOpacity = 0.10;
+
+// ── Build controls ─────────────────────────────────────────────────────────
+const controlsEl = document.getElementById('waveControls');
+
+WAVES.forEach((wave, i) => {
+  const hex = `#${wave.r.toString(16).padStart(2,'0')}${wave.g.toString(16).padStart(2,'0')}${wave.b.toString(16).padStart(2,'0')}`;
+  const label = ['Darkest','Dark','Mid','Brightest'][i];
+
+  const row = document.createElement('div');
+  row.className = 'wave-row';
+  row.innerHTML = `
+    <div class="wave-label">
+      <div class="swatch" style="background:${hex}"></div>
+      <span>Wave ${i+1} — ${label}</span>
+      <span class="val" id="wv${i}">${wave.opacity.toFixed(2)}</span>
+    </div>
+    <div class="slider-row">
+      <span>0</span>
+      <input type="range" id="ws${i}" min="0" max="100" value="${Math.round(wave.opacity*100)}">
+      <span>1</span>
+    </div>
+  `;
+  controlsEl.appendChild(row);
+
+  row.querySelector(`#ws${i}`).addEventListener('input', e => {
+    wave.opacity = e.target.value / 100;
+    document.getElementById(`wv${i}`).textContent = wave.opacity.toFixed(2);
+    updateOutput();
+  });
+});
+
+document.getElementById('glowSlider').addEventListener('input', e => {
+  glowOpacity = e.target.value / 100;
+  document.getElementById('glowVal').textContent = glowOpacity.toFixed(2);
+  updateOutput();
+});
+
+// ── Canvas waveform ────────────────────────────────────────────────────────
+const canvas = document.getElementById('wave');
+const wrap   = canvas.parentElement;
+const dpr    = window.devicePixelRatio || 1;
+const ctx2   = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const r = wrap.getBoundingClientRect();
+  canvas.width  = r.width  * dpr;
+  canvas.height = r.height * dpr;
+  ctx2.scale(dpr, dpr);
+}
+resizeCanvas();
+
+let smoothLevel = 0;
+let t0 = null;
+
+// Voice level slider
+const voiceSlider = document.getElementById('voiceLevel');
+const voiceValEl  = document.getElementById('voiceVal');
+voiceSlider.addEventListener('input', () => {
+  voiceValEl.textContent = voiceSlider.value + '%';
+});
+
+function drawWave(ts) {
+  if (!t0) t0 = ts;
+  const t = (ts - t0) / 1000;
+
+  const target = voiceSlider.value / 100 * 0.85;
+  const w = target > smoothLevel ? 0.18 : 0.25;
+  smoothLevel = Math.min(0.6, smoothLevel * (1 - w) + target * w);
+
+  const W  = wrap.getBoundingClientRect().width;
+  const H  = wrap.getBoundingClientRect().height;
+  const cy = H / 2;
+  ctx2.clearRect(0, 0, W, H);
+
+  WAVES.forEach((wave, i) => {
+    const phase = t * 2.0 + i * 0.7;
+    const freq  = 1.8 + i * 0.4;
+    const amp   = cy * 1.6 * wave.scale * (0.05 + smoothLevel * 0.95);
+    const color = `rgb(${wave.r},${wave.g},${wave.b})`;
+
+    // Upper
+    ctx2.beginPath();
+    ctx2.globalAlpha = wave.opacity;
+    ctx2.strokeStyle = color;
+    ctx2.lineWidth   = 1.2;
+    ctx2.lineCap = ctx2.lineJoin = 'round';
+    for (let x = 0; x <= W; x += 0.5) {
+      const p = x / W;
+      const y = cy + Math.sin(phase + p * freq * Math.PI * 2) * amp * Math.sin(p * Math.PI);
+      x === 0 ? ctx2.moveTo(x, y) : ctx2.lineTo(x, y);
+    }
+    ctx2.stroke();
+
+    // Lower (50% amp)
+    ctx2.beginPath();
+    ctx2.lineWidth = 0.6;
+    for (let x = 0; x <= W; x += 0.5) {
+      const p = x / W;
+      const y = cy - Math.sin(phase + p * freq * Math.PI * 2) * amp * 0.5 * Math.sin(p * Math.PI);
+      x === 0 ? ctx2.moveTo(x, y) : ctx2.lineTo(x, y);
+    }
+    ctx2.stroke();
+
+    // Glow on brightest
+    if (i === WAVES.length - 1) {
+      ctx2.beginPath();
+      ctx2.lineWidth   = 3;
+      ctx2.globalAlpha = glowOpacity;
+      for (let x = 0; x <= W; x += 0.5) {
+        const p = x / W;
+        const y = cy + Math.sin(phase + p * freq * Math.PI * 2) * amp * Math.sin(p * Math.PI);
+        x === 0 ? ctx2.moveTo(x, y) : ctx2.lineTo(x, y);
+      }
+      ctx2.stroke();
+    }
+  });
+
+  ctx2.globalAlpha = 1;
+  requestAnimationFrame(drawWave);
+}
+
+requestAnimationFrame(drawWave);
+
+// ── Output ─────────────────────────────────────────────────────────────────
+function updateOutput() {
+  const lines = WAVES.map(w =>
+    `  { r: ${String(w.r).padStart(3)}, g: 0x${w.g.toString(16).padStart(2,'0').toUpperCase()}, b: 0x${w.b.toString(16).padStart(2,'0').toUpperCase()}, scale: ${w.scale.toFixed(2)}, opacity: ${w.opacity.toFixed(2)} },`
+  );
+  document.getElementById('output').textContent =
+    `const WAVES = [\n${lines.join('\n')}\n];\nlet glowOpacity = ${glowOpacity.toFixed(2)};`;
+}
+
+updateOutput();
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('output').textContent);
+  const btn = document.getElementById('copyBtn');
+  btn.textContent = 'Copied!';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = 'Copy to clipboard'; btn.classList.remove('copied'); }, 1500);
+});
+</script>
+</body>
+</html>
