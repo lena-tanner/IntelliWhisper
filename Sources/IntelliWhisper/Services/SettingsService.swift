@@ -151,8 +151,18 @@ final class SettingsService: ObservableObject {
             self.hotkeyChoice = migrated
             d.set(migrated, forKey: Keys.hotkeyChoice)
         }
-        self.outputMode = d.string(forKey: Keys.outputMode) ?? OutputMode.clipboard.rawValue
-        self.smartPaste = d.bool(forKey: Keys.smartPaste)
+        // Migrate legacy "smartPaste" output mode (was briefly a 4th mode,
+        // now a toggle on top of "paste"). Treat it as paste + smartPaste=true.
+        let rawOutputMode = d.string(forKey: Keys.outputMode) ?? OutputMode.clipboard.rawValue
+        if rawOutputMode == "smartPaste" {
+            self.outputMode = OutputMode.paste.rawValue
+            d.set(OutputMode.paste.rawValue, forKey: Keys.outputMode)
+            self.smartPaste = true
+            d.set(true, forKey: Keys.smartPaste)
+        } else {
+            self.outputMode = rawOutputMode
+            self.smartPaste = d.bool(forKey: Keys.smartPaste)
+        }
         self.formatGeneral = d.object(forKey: Keys.formatGeneral) as? Bool ?? true
         self.formatEmail = d.object(forKey: Keys.formatEmail) as? Bool ?? true
         self.generalSystemPrompt = d.string(forKey: Keys.generalSystemPrompt) ?? Self.defaultGeneralSystemPrompt
