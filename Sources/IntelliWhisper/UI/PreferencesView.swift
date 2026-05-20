@@ -143,7 +143,7 @@ private struct GeneralTab: View {
                         .onChange(of: settings.smartPaste) { _, newValue in
                             orchestrator.smartPaste = newValue
                         }
-                    Text("Only paste when a text field is confirmed focused. Falls back to clipboard if none is detected; attempts paste when uncertain (e.g. in browsers).")
+                    Text("Only paste when a text field is confirmed focused. Falls back to clipboard if none is detected or uncertain (e.g. Finder, VS Code file tree).")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else if settings.outputMode == OutputMode.clipboardAndPaste.rawValue {

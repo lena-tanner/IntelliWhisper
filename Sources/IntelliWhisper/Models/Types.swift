@@ -38,8 +38,8 @@ enum OutputMode: String, Sendable, CaseIterable {
 /// Result of checking whether the focused UI element can accept pasted text.
 enum TextFieldDetectionResult: Sendable {
     case confirmed   // known editable AX role — safe to paste
-    case denied      // confirmed non-editable or no focused element
-    case unknown     // unrecognized role (browser, Electron) — defer to output mode
+    case denied      // confirmed non-editable or no focused element — skip paste
+    case unknown     // unrecognized role (Finder browser, VS Code file tree, etc.) — skip paste
 }
 
 /// Available Whisper model variants for on-device transcription.

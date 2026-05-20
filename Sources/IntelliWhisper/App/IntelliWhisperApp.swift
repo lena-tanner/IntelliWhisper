@@ -60,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         // Restore persisted preferences into the orchestrator.
         orchestrator.preferredLanguage = Language(rawValue: settings.preferredLanguage)
         orchestrator.outputMode = OutputMode(rawValue: settings.outputMode) ?? .clipboard
+        orchestrator.smartPaste = settings.smartPaste
         log.info("Preferences restored: lang=\(orchestrator.preferredLanguage?.rawValue ?? "auto"), output=\(orchestrator.outputMode.rawValue)")
 
         // 2. Create hotkey manager (start() is deferred to initializer or first-run)

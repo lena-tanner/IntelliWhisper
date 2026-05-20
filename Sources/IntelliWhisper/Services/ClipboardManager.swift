@@ -127,8 +127,8 @@ final class ClipboardManager {
 
     /// Checks whether the frontmost app's focused element can accept pasted text.
     /// Returns .confirmed for known editable roles, .denied when there is no focused
-    /// element or AX is not trusted, and .unknown for unrecognized roles (browsers,
-    /// Electron, terminals) where we cannot reliably determine editability.
+    /// element or AX is not trusted, and .unknown for unrecognized roles. Both .denied
+    /// and .unknown cause smart paste to fall back to clipboard-only.
     func detectFocusedTextField() -> TextFieldDetectionResult {
         guard AXIsProcessTrusted() else { return .denied }
         guard let frontApp = NSWorkspace.shared.frontmostApplication else { return .denied }

@@ -201,19 +201,22 @@ final class PipelineOrchestrator: ObservableObject {
                 var pasted = false
                 var smartPasteFallback = false
 
-                // Smart paste only applies to .paste mode: if detection confirms no text
-                // field, fall back to clipboard. .unknown (browsers) defers to normal paste.
+                // Smart paste only applies to .paste mode: only paste when a text field is
+                // confirmed present. Both .denied (no editable element) and .unknown (role
+                // unrecognized — e.g. Finder browser, VS Code file tree) fall back to clipboard.
+                // WebKit and VS Code's code editor both expose real AX text roles, so .confirmed
+                // correctly covers those cases.
                 // .clipboardAndPaste always keeps text on clipboard so no fallback needed.
                 let detection: TextFieldDetectionResult = smartPaste && self.outputMode == .paste
                     ? clipboard.detectFocusedTextField()
                     : .confirmed
 
                 switch (self.outputMode, detection) {
-                case (.paste, .denied):
+                case (.paste, .confirmed):
+                    pasted = await clipboard.copyAndPaste(text: formatted)
+                case (.paste, _):
                     clipboard.copy(text: formatted)
                     smartPasteFallback = true
-                case (.paste, _):
-                    pasted = await clipboard.copyAndPaste(text: formatted)
                 case (.clipboardAndPaste, _):
                     pasted = await clipboard.copyAndPasteKeeping(text: formatted)
                 case (.clipboard, _):
