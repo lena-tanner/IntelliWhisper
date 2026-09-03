@@ -16,19 +16,55 @@ final class WhisperKitTranscriber: Transcribing, @unchecked Sendable {
         return appSupport.appendingPathComponent("IntelliWhisper/Models")
     }()
 
-    /// Initialize WhisperKit with the given model, downloading on first use.
-    /// The download is cached — subsequent launches load from disk.
-    func setup(model: WhisperModel) async throws {
-        log.info("Loading model: \(model.rawValue)")
+    /// Folder for a model variant that WhisperKit has already downloaded, or nil.
+    /// Checked so a launch without network (e.g. login before Wi-Fi is up) can
+    /// load from disk instead of failing on the HuggingFace API round-trip.
+    private static func cachedModelFolder(for model: WhisperModel) -> URL? {
+        let folder = downloadBase
+            .appendingPathComponent("models/argmaxinc/whisperkit-coreml")
+            .appendingPathComponent("openai_whisper-\(model.rawValue)")
+        let required = ["MelSpectrogram.mlmodelc", "AudioEncoder.mlmodelc", "TextDecoder.mlmodelc", "config.json"]
+        let fm = FileManager.default
+        guard required.allSatisfy({ fm.fileExists(atPath: folder.appendingPathComponent($0).path) }) else {
+            return nil
+        }
+        return folder
+    }
+
+    private static func makeConfig(model: WhisperModel, localFolder: URL?) -> WhisperKitConfig {
         let config = WhisperKitConfig()
         config.model = model.rawValue
-        config.downloadBase = Self.downloadBase
-        config.download = true
+        config.downloadBase = downloadBase
+        // Keep the tokenizer next to the models. WhisperKit's default is
+        // ~/Documents/huggingface, which macOS guards with a Files & Folders
+        // permission we never request — on Tahoe the read is denied and model
+        // setup fails with "config.json couldn't be opened".
+        config.tokenizerFolder = downloadBase
+        config.modelFolder = localFolder?.path
+        config.download = localFolder == nil
         config.prewarm = true
         config.load = true
         config.verbose = true
+        return config
+    }
 
-        whisperKit = try await WhisperKit(config)
+    /// Initialize WhisperKit with the given model, downloading on first use.
+    /// A complete cached download is loaded directly from disk without
+    /// contacting HuggingFace; if that fails, fall back to a fresh download.
+    func setup(model: WhisperModel) async throws {
+        log.info("Loading model: \(model.rawValue)")
+
+        if let cached = Self.cachedModelFolder(for: model) {
+            do {
+                whisperKit = try await WhisperKit(Self.makeConfig(model: model, localFolder: cached))
+                log.info("Model \(model.rawValue) loaded from cache")
+                return
+            } catch {
+                log.warning("Cached model \(model.rawValue) failed to load — retrying with download: \(error.localizedDescription)")
+            }
+        }
+
+        whisperKit = try await WhisperKit(Self.makeConfig(model: model, localFolder: nil))
         log.info("Model \(model.rawValue) loaded successfully")
     }
 

@@ -57,12 +57,15 @@ final class AppInitializer: ObservableObject {
         await runStep(.inputMonitoring) {
             if !CGPreflightListenEventAccess() {
                 CGRequestListenEventAccess()
-                throw InitError.message("Input Monitoring permission requested. Grant it in the system prompt, then restart the app.")
+                throw InitError.message("Input Monitoring permission requested. Grant it in System Settings — the hotkey activates automatically once granted.")
             }
             let granted = hotkey.start()
             if !granted {
                 throw InitError.message("Event tap creation failed despite Input Monitoring permission being granted.")
             }
+        }
+        if case .failed = steps[.inputMonitoring], !CGPreflightListenEventAccess() {
+            pollInputMonitoring(hotkey: hotkey)
         }
 
         // Step 2: WhisperKit model download + load
@@ -90,6 +93,31 @@ final class AppInitializer: ObservableObject {
     }
 
     // MARK: - Private
+
+    private var inputMonitoringPollTask: Task<Void, Never>?
+
+    /// The permission is often lost after an update (TCC re-keys the binary)
+    /// and users rarely restart the app after re-granting it. Keep checking
+    /// and install the event tap as soon as access appears.
+    private func pollInputMonitoring(hotkey: HotkeyManager) {
+        inputMonitoringPollTask?.cancel()
+        log.info("Input Monitoring not granted — polling for permission grant")
+        inputMonitoringPollTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard CGPreflightListenEventAccess() else { continue }
+                if hotkey.start() {
+                    self?.steps[.inputMonitoring] = .ready
+                    log.info("Init step [inputMonitoring] ready (granted after launch)")
+                } else {
+                    let message = "Event tap creation failed despite Input Monitoring permission being granted. Restart the app."
+                    self?.steps[.inputMonitoring] = .failed(message)
+                    log.warning("[inputMonitoring] \(message)")
+                }
+                return
+            }
+        }
+    }
 
     private func runStep(_ step: Step, action: () async throws -> Void) async {
         currentStep = step
